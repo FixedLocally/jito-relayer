@@ -14,6 +14,7 @@ use crossbeam_channel::{bounded, Receiver, RecvError, Sender};
 use dashmap::DashMap;
 use histogram::Histogram;
 use jito_core::ofac::is_tx_ofac_related;
+use jito_core::tx_logger::log_tx;
 use jito_protos::{
     convert::packet_to_proto_packet,
     packet::PacketBatch as ProtoPacketBatch,
@@ -657,8 +658,10 @@ impl RelayerImpl {
                     .iter()
                     .filter(|p| !p.meta().discard())
                     .filter_map(|packet| {
+                        let tx: VersionedTransaction = packet.deserialize_slice(..).ok()?;
+                        let meta = packet.meta();
+                        log_tx(meta, &tx);
                         if !ofac_addresses.is_empty() {
-                            let tx: VersionedTransaction = packet.deserialize_slice(..).ok()?;
                             if !is_tx_ofac_related(&tx, ofac_addresses, address_lookup_table_cache)
                             {
                                 Some(packet)
